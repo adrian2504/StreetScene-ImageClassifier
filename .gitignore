@@ -5,6 +5,6 @@ __pycache__/
 .ipynb_checkpoints/
 .DS_Store
 
-# dont commit data or trained models
+# not committing data or trained models
 data/
 artifacts/  
