@@ -4,6 +4,7 @@ import json
 import os
 from datetime import datetime
 from typing import Any, Dict, Tuple, Optional
+import numpy as np
 
 import torch
 import torch.nn as nn
@@ -95,7 +96,13 @@ def main():
     test_loader = DataLoader(test_ds, batch_size=bs, shuffle=False, num_workers=nw, pin_memory=pin)
 
     model = build_model(cfg, labels).to(dev)
-    loss_fn = nn.CrossEntropyLoss()
+
+    counts = df_train["label"].value_counts()
+    w = np.array([1.0 / counts[l] for l in labels], dtype=np.float32)
+    w = w / w.sum() * len(labels)
+    class_weights = torch.tensor(w, device=dev)
+
+    loss_fn = nn.CrossEntropyLoss(weight=class_weights)
 
     epochs = int(cfg["train"]["epochs"])
     lr = float(cfg["train"]["lr"])
