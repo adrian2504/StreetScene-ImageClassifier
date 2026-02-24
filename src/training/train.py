@@ -97,8 +97,19 @@ def main():
 
     model = build_model(cfg, labels).to(dev)
 
+    init_ckpt = cfg["train"].get("init_checkpoint")
+    if init_ckpt:
+        ckpt = torch.load(init_ckpt, map_location="cpu")
+        state = ckpt["model_state"] if "model_state" in ckpt else ckpt
+        missing, unexpected = model.load_state_dict(state, strict=False)
+        print(f"Loaded init checkpoint: {init_ckpt}")
+        if missing:
+            print("Missing keys:", missing)
+        if unexpected:
+            print("Unexpected keys:", unexpected)
+
     counts = df_train["label"].value_counts()
-    w = np.array([1.0 / counts[l] for l in labels], dtype=np.float32)
+    w = np.array([1.0 / max(1, int(counts.get(l, 0))) for l in labels], dtype=np.float32)
     w = w / w.sum() * len(labels)
     class_weights = torch.tensor(w, device=dev)
 
@@ -148,13 +159,17 @@ def main():
             logits = model(x)
             loss = loss_fn(logits, y)
             loss.backward()
+            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
             optimizer.step()
 
             running += float(loss.item()) * x.size(0)
             pbar.set_postfix(loss=float(loss.item()))
 
         if scheduler is not None:
-            scheduler.step()
+            if isinstance(scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau):
+                scheduler.step(tracked if tracked is not None else train_loss)
+            else:
+                scheduler.step()
 
         train_loss = running / max(1, len(train_ds))
 
@@ -172,6 +187,22 @@ def main():
         })
         with open(os.path.join(run_dir, "history.json"), "w", encoding="utf-8") as f:
             json.dump(history, f, indent=2)
+
+        if val_out is not None:
+            print(
+            f"Epoch {epoch}/{epochs} | "
+            f"train_loss={train_loss:.4f} | "
+            f"val_acc={val_out['metrics'].get('accuracy', 0):.4f} | "
+            f"val_macro_f1={val_out['metrics'].get('macro_f1', 0):.4f} | "
+            f"lr={optimizer.param_groups[0]['lr']:.6f}"
+         )
+        else:
+            print(
+                f"Epoch {epoch}/{epochs} | "
+                f"train_loss={train_loss:.4f} | "
+                f"lr={optimizer.param_groups[0]['lr']:.6f}"
+            )
+
 
         # Save best only if val exists
         if tracked is not None and tracked > best_metric:

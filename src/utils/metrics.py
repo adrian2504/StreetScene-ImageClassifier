@@ -16,5 +16,7 @@ def compute_metrics(y_true: List[int], y_pred: List[int], labels: List[str]) -> 
     acc = float(accuracy_score(y_true, y_pred))
     macro_f1 = float(f1_score(y_true, y_pred, average="macro"))
     cm = confusion_matrix(y_true, y_pred, labels=list(range(len(labels))))
-    report = classification_report(y_true, y_pred, target_names=labels, digits=4)
+    report = classification_report(
+    y_true, y_pred, target_names=labels, digits=4, zero_division=0
+)
     return EvalResult(metrics={"accuracy": acc, "macro_f1": macro_f1}, cm=cm, report_text=report)

@@ -1,0 +1,29 @@
+seed: 42
+run_name: resnet18_stage2_finetune
+
+data:
+  manifest_csv: data/dataset_manifest.csv
+  image_size: 224
+  batch_size: 16
+  num_workers: 0
+
+model:
+  name: resnet18
+  pretrained: true
+  freeze_backbone: false
+
+train:
+  epochs: 6
+  lr: 0.00005
+  weight_decay: 0.0001
+  optimizer: adamw
+  scheduler: cosine
+  early_stopping:
+    enabled: true
+    patience: 3
+    min_delta: 0.0
+  # fill this after stage1 run:
+  # init_checkpoint: artifacts/resnet18_stage1_head_only_YYYYMMDD_HHMMSS/best.pt
+
+output:
+  root_dir: artifacts
